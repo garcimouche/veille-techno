@@ -1,0 +1,67 @@
+# Configuration des topics et sources pour la veille
+# Ce fichier est lu par init-db.java et rechargé périodiquement.
+# Pour ajouter une source : éditer ce fichier puis relancer init-db.java
+#   (ou un script reload-config dédié)
+
+topics:
+  - slug: java
+    name: Java
+    description: Java 21+, JVM, JEPs, performance, modern Java practices
+    keywords: [java, jvm, jep, openjdk, jdk, java21, java22, java23, java24, java25]
+    relevance_threshold: 6
+    sources:
+      - { type: rss, name: "Inside Java",        url: "https://inside.java/feed.xml" }
+      - { type: rss, name: "Oracle Java Blog",   url: "https://blogs.oracle.com/java/rss" }
+      - { type: rss, name: "Foojay.io",          url: "https://foojay.io/feed/" }
+      - { type: rss, name: "InfoQ Java",         url: "https://feed.infoq.com/java/" }
+      - { type: rss, name: "Baeldung",           url: "https://www.baeldung.com/feed" }
+      - { type: rss, name: "JetBrains IDEA",     url: "https://blog.jetbrains.com/idea/feed/" }
+      - { type: rss, name: "Vlad Mihalcea",      url: "https://vladmihalcea.com/feed/" }
+      - { type: rss, name: "Thomas Vitale",      url: "https://www.thomasvitale.com/index.xml" }
+      - { type: rss, name: "SivaLabs",           url: "https://www.sivalabs.in/index.xml" }
+      - { type: rss, name: "Spring Blog",        url: "https://spring.io/blog.atom" }
+
+  - slug: angular
+    name: Angular
+    description: Angular framework, signals, zoneless, modern reactivity patterns
+    keywords: [angular, signals, zoneless, ngrx, rxjs, standalone, "signal forms"]
+    relevance_threshold: 6
+    sources:
+      - { type: rss,    name: "Angular Blog",        url: "https://blog.angular.dev/feed" }
+      - { type: github, name: "Angular Releases",    url: "https://github.com/angular/angular",
+          config: { mode: releases } }
+      - { type: rss,    name: "Angular Love",        url: "https://angular.love/feed" }
+      - { type: rss,    name: "inDepthDev",          url: "https://indepth.dev/feed" }
+      - { type: rss,    name: "Angular Experts",     url: "https://angularexperts.io/blog/feed.xml" }
+      - { type: rss,    name: "This is Angular",     url: "https://dev.to/feed/this-is-angular" }
+      - { type: rss,    name: "Netanel Basal",       url: "https://netbasal.com/feed" }
+      - { type: rss,    name: "Tim Deschryver",      url: "https://timdeschryver.dev/blog/rss.xml" }
+      - { type: rss,    name: "Angular Architects",  url: "https://www.angulararchitects.io/en/feed/" }
+
+  - slug: ai
+    name: AI / LLM
+    description: LLMs, AI agents, MCP, building with Claude/GPT, AI engineering practices
+    keywords: [claude, anthropic, openai, gpt, llm, agent, mcp, "ai engineering", rag, langchain, ollama]
+    relevance_threshold: 7  # plus strict car volume + bruit élevé
+    sources:
+      # Labs officiels
+      - { type: rss, name: "Anthropic News",       url: "https://www.anthropic.com/news/rss.xml" }
+      - { type: rss, name: "Anthropic Engineering", url: "https://www.anthropic.com/engineering/rss.xml" }
+      - { type: rss, name: "OpenAI Blog",          url: "https://openai.com/blog/rss.xml" }
+      - { type: rss, name: "Google DeepMind",      url: "https://deepmind.google/blog/rss.xml" }
+      - { type: rss, name: "HuggingFace Blog",     url: "https://huggingface.co/blog/feed.xml" }
+      # Newsletters
+      - { type: rss, name: "Latent Space",         url: "https://www.latent.space/feed" }
+      - { type: rss, name: "Import AI",            url: "https://importai.substack.com/feed" }
+      - { type: rss, name: "The Batch",            url: "https://www.deeplearning.ai/the-batch/feed" }
+      - { type: rss, name: "Ahead of AI",          url: "https://magazine.sebastianraschka.com/feed" }
+      # Practitioners
+      - { type: rss, name: "Simon Willison",       url: "https://simonwillison.net/atom/everything/" }
+      - { type: rss, name: "Chip Huyen",           url: "https://huyenchip.com/feed.xml" }
+      - { type: rss, name: "Eugene Yan",           url: "https://eugeneyan.com/rss/" }
+      - { type: rss, name: "Hamel Husain",         url: "https://hamel.dev/index.xml" }
+      # Communauté
+      - { type: reddit, name: "r/LocalLLaMA",       url: "https://reddit.com/r/LocalLLaMA",
+          config: { sort: top, period: week, limit: 15 } }
+      - { type: hn,     name: "HN AI keywords",     url: "https://hn.algolia.com/api/v1/search",
+          config: { query: "claude OR \"AI agent\" OR MCP", points_min: 100 } }
