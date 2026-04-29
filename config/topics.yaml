@@ -11,7 +11,10 @@ topics:
     relevance_threshold: 6
     sources:
       - { type: rss, name: "Inside Java",        url: "https://inside.java/feed.xml" }
-      - { type: rss, name: "Oracle Java Blog",   url: "https://blogs.oracle.com/java/rss" }
+      # Oracle Java Blog disabled 2026-04-29: Akamai blocks all programmatic UAs.
+      # Inside Java already covers Oracle Java team announcements.
+      # - { type: rss, name: "Oracle Java Blog",   url: "https://blogs.oracle.com/java/rss" }
+      - { type: rss, name: "Quarkus",            url: "https://quarkus.io/feed.xml" }
       - { type: rss, name: "Foojay.io",          url: "https://foojay.io/feed/" }
       - { type: rss, name: "InfoQ Java",         url: "https://feed.infoq.com/java/" }
       - { type: rss, name: "Baeldung",           url: "https://www.baeldung.com/feed" }
