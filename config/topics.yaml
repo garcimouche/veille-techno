@@ -23,6 +23,7 @@ topics:
       - { type: rss, name: "Thomas Vitale",      url: "https://www.thomasvitale.com/index.xml" }
       - { type: rss, name: "SivaLabs",           url: "https://www.sivalabs.in/index.xml" }
       - { type: rss, name: "Spring Blog",        url: "https://spring.io/blog.atom" }
+      - { type: rss, name: "Les Cast Codeurs",   url: "https://lescastcodeurs.com/feed-intern.atom" }
 
   - slug: angular
     name: Angular
