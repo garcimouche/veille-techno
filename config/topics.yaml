@@ -41,6 +41,9 @@ topics:
       - { type: rss,    name: "Netanel Basal",       url: "https://netbasal.com/feed" }
       - { type: rss,    name: "Tim Deschryver",      url: "https://timdeschryver.dev/blog/rss.xml" }
       - { type: rss,    name: "Angular Architects",  url: "https://www.angulararchitects.io/en/feed/" }
+      - { type: rss,    name: "To the new blog",     url: "https://www.tothenew.com/blog/category/technology/angular/feed" }
+      - { type: rss ,   name: "Angular university", url: "https://angular-university.io" }
+           
 
   - slug: ai
     name: AI / LLM
