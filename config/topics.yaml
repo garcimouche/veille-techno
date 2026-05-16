@@ -29,7 +29,7 @@ topics:
     name: Angular
     description: Angular framework, signals, zoneless, modern reactivity patterns
     keywords: [angular, signals, zoneless, ngrx, rxjs, standalone, "signal forms"]
-    relevance_threshold: 6
+    relevance_threshold: 4
     sources:
       - { type: rss,    name: "Angular Blog",        url: "https://blog.angular.dev/feed" }
       - { type: github, name: "Angular Releases",    url: "https://github.com/angular/angular",
