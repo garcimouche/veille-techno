@@ -63,6 +63,9 @@ class Veille implements Runnable {
         @Option(names = "--since", description = "Time window for classify/summarize/digest (default: ${DEFAULT-VALUE})")
         String since = "7d";
 
+        @Option(names = "--until", description = "Upper bound 'YYYY-MM-DD', inclusive (default: now). Implies --skip-fetch.")
+        String until;
+
         @Option(names = "--send", description = "Send the resulting digest(s) via Resend")
         boolean send;
 
@@ -81,16 +84,22 @@ class Veille implements Runnable {
                     ? new String[]{"--env", envPath, "--db", dbPath}
                     : new String[]{"--env", envPath};
 
-            if (!skipFetch) {
+            // A catch-up on a past window has nothing to gain from a fetch: feeds only
+            // carry recent items, and anything new would be excluded by --until anyway.
+            if (!skipFetch && until == null) {
                 step("fetch-rss", () -> new CommandLine(new FetchRss())
                         .execute(append(commonArgs, "--topic", topic)));
             }
 
+            String[] windowArgs = until != null
+                    ? new String[]{"--since", since, "--until", until}
+                    : new String[]{"--since", since};
+
             step("classify-relevance", () -> new CommandLine(new ClassifyRelevance())
-                    .execute(append(commonArgs, "--topic", topic, "--since", since)));
+                    .execute(append(commonArgs, append(windowArgs, "--topic", topic))));
 
             step("summarize", () -> new CommandLine(new Summarize())
-                    .execute(append(commonArgs, "--topic", topic, "--since", since)));
+                    .execute(append(commonArgs, append(windowArgs, "--topic", topic))));
 
             List<String> topics = "all".equals(topic)
                     ? listActiveTopicSlugs(envPath, dbPath)
@@ -98,7 +107,7 @@ class Veille implements Runnable {
 
             for (String t : topics) {
                 step("generate-digest [" + t + "]", () -> new CommandLine(new GenerateDigest())
-                        .execute(append(commonArgs, "--topic", t, "--since", since)));
+                        .execute(append(commonArgs, append(windowArgs, "--topic", t))));
                 if (send) {
                     step("send-email [" + t + "]", () -> new CommandLine(new SendEmail())
                             .execute(append(commonArgs, "--topic", t)));

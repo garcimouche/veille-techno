@@ -25,7 +25,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
@@ -250,7 +250,9 @@ class SendEmail implements Callable<Integer> {
     }
 
     private static String formatDate(long ms) {
-        return Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
+        // Period bounds are stored as UTC instants; render them the same way so the
+        // console and subject line match the --since/--until the digest was built with.
+        return Instant.ofEpochMilli(ms).atZone(ZoneOffset.UTC)
                 .toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE);
     }
 

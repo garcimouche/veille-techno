@@ -43,6 +43,9 @@ class Summarize implements Callable<Integer> {
     @Option(names = "--since", description = "Only items published since: '30d', '7d', '24h', '1y', or 'YYYY-MM-DD' (default: no filter)")
     String since;
 
+    @Option(names = "--until", description = "Only items published up to 'YYYY-MM-DD', inclusive (default: no upper bound)")
+    String until;
+
     @Option(names = "--env", description = "Path to .env (default: ${DEFAULT-VALUE})")
     Path envPath = Paths.get("config/.env");
 
@@ -105,7 +108,8 @@ class Summarize implements Callable<Integer> {
             }
 
             Long sinceMs = parseSince(since);
-            List<Item> items = loadItems(con, topic, sinceMs, limit);
+            Long untilMs = parseUntil(until);
+            List<Item> items = loadItems(con, topic, sinceMs, untilMs, limit);
             if (items.isEmpty()) {
                 System.out.println("No CLASSIFIED items to summarize for topic '" + topic + "'.");
                 return 0;
@@ -113,6 +117,7 @@ class Summarize implements Callable<Integer> {
 
             System.out.printf("Model      : %s%n", model);
             if (sinceMs != null) System.out.printf("Since      : %s%n", since);
+            if (untilMs != null) System.out.printf("Until      : %s%n", until);
             System.out.printf("Items      : %d to summarize%n", items.size());
             if (dryRun) {
                 System.out.println("(dry-run — no API calls, no DB writes)");
@@ -153,7 +158,7 @@ class Summarize implements Callable<Integer> {
     record Item(long id, String topicName, String title, String url, String author,
                 String content, String sourceName, Long publishedAtMs) {}
 
-    private static List<Item> loadItems(Connection con, String topic, Long sinceMs, int limit) throws Exception {
+    private static List<Item> loadItems(Connection con, String topic, Long sinceMs, Long untilMs, int limit) throws Exception {
         StringBuilder sql = new StringBuilder(
                 "SELECT i.id, t.name, i.title, i.url, i.author, i.content, s.name, i.published_at " +
                         "FROM items i " +
@@ -162,6 +167,7 @@ class Summarize implements Callable<Integer> {
                         "WHERE i.status = 'CLASSIFIED'");
         if (!"all".equals(topic)) sql.append(" AND t.slug = ?");
         if (sinceMs != null) sql.append(" AND i.published_at >= ?");
+        if (untilMs != null) sql.append(" AND i.published_at <= ?");
         sql.append(" ORDER BY i.relevance_score DESC, i.published_at DESC");
         if (limit > 0) sql.append(" LIMIT ").append(limit);
 
@@ -170,6 +176,7 @@ class Summarize implements Callable<Integer> {
             int p = 1;
             if (!"all".equals(topic)) ps.setString(p++, topic);
             if (sinceMs != null) ps.setLong(p++, sinceMs);
+            if (untilMs != null) ps.setLong(p++, untilMs);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     long ts = rs.getLong(8);
@@ -312,6 +319,17 @@ class Summarize implements Callable<Integer> {
             case "deep" -> env.getOrDefault("CLAUDE_MODEL_DEEP", "claude-sonnet-4-6");
             default -> override;
         };
+    }
+
+    /** Inclusive upper bound: the last millisecond of the given day (UTC), or null if unset. */
+    private static Long parseUntil(String until) {
+        if (until == null || until.isBlank()) return null;
+        String s = until.strip();
+        if (!s.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            throw new IllegalArgumentException("--until: expected 'YYYY-MM-DD'; got: " + until);
+        }
+        return java.time.LocalDate.parse(s).plusDays(1)
+                .atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli() - 1;
     }
 
     private static Long parseSince(String since) {

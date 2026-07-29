@@ -19,8 +19,8 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,6 +41,10 @@ class GenerateDigest implements Callable<Integer> {
     @Option(names = "--since",
             description = "Time window: '7d', '24h', '30d', '1y', or 'YYYY-MM-DD' (default: ${DEFAULT-VALUE})")
     String since = "7d";
+
+    @Option(names = "--until",
+            description = "Upper bound 'YYYY-MM-DD', inclusive (default: now). Useful to catch up on a past period.")
+    String until;
 
     @Option(names = "--output",
             description = "Markdown output file (default: data/digests/digest-<topic>-<YYYYMMDD>.md)")
@@ -72,8 +76,12 @@ class GenerateDigest implements Callable<Integer> {
         String dbPath = dbPathOverride != null ? dbPathOverride
                 : env.getOrDefault("DB_PATH", "./data/veille.db");
 
-        long periodEndMs = System.currentTimeMillis();
         long periodStartMs = parseSinceCutoff(since);
+        long periodEndMs = parseUntilCutoff(until);
+        if (periodEndMs < periodStartMs) {
+            System.err.printf("ERROR: --until (%s) is before --since (%s)%n", until, since);
+            return 2;
+        }
 
         try (Connection con = DriverManager.getConnection("jdbc:sqlite:" + dbPath)) {
             try (Statement st = con.createStatement()) {
@@ -86,16 +94,20 @@ class GenerateDigest implements Callable<Integer> {
                 return 2;
             }
 
-            List<Item> items = loadItems(con, topicInfo.id, periodStartMs);
+            List<Item> items = loadItems(con, topicInfo.id, periodStartMs, periodEndMs);
             if (items.isEmpty()) {
-                System.out.println("No SUMMARIZED items for topic '" + topic + "' since " + since + ".");
+                System.out.println("No SUMMARIZED items for topic '" + topic + "' since " + since
+                        + (until != null ? " until " + until : "") + ".");
                 return 0;
             }
 
-            String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+            // Name the file after the period end, not the generation date: a catch-up run
+            // would otherwise overwrite the digest already generated today for the same topic.
+            String periodEndDate = Instant.ofEpochMilli(periodEndMs).atZone(ZoneOffset.UTC)
+                    .toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE);
             Path mdPath = outputPath != null ? outputPath
                     : Paths.get("data/digests/digest-" + topic + "-"
-                    + today.replace("-", "") + ".md");
+                    + periodEndDate.replace("-", "") + ".md");
             if (mdPath.getParent() != null) Files.createDirectories(mdPath.getParent());
 
             String md = renderMarkdown(topicInfo, items, periodStartMs, periodEndMs);
@@ -104,7 +116,7 @@ class GenerateDigest implements Callable<Integer> {
             String html = null;
             Path htmlPath = null;
             if (!noHtml) {
-                html = renderHtml(md, topicInfo, today);
+                html = renderHtml(md, topicInfo, periodEndDate);
                 htmlPath = htmlOutputPath != null ? htmlOutputPath
                         : Paths.get(mdPath.toString().replaceAll("\\.md$", "") + ".html");
                 if (htmlPath.getParent() != null) Files.createDirectories(htmlPath.getParent());
@@ -125,8 +137,8 @@ class GenerateDigest implements Callable<Integer> {
             System.out.println("------");
             System.out.printf("  Topic     : %s (%s)%n", topicInfo.name, topicInfo.slug);
             System.out.printf("  Period    : %s → %s%n",
-                    Instant.ofEpochMilli(periodStartMs).atZone(ZoneId.systemDefault()).toLocalDate(),
-                    Instant.ofEpochMilli(periodEndMs).atZone(ZoneId.systemDefault()).toLocalDate());
+                    Instant.ofEpochMilli(periodStartMs).atZone(ZoneOffset.UTC).toLocalDate(),
+                    Instant.ofEpochMilli(periodEndMs).atZone(ZoneOffset.UTC).toLocalDate());
             System.out.printf("  Items     : %d  (%d unique sources)%n", items.size(), uniqueSources.size());
             System.out.printf("  Markdown  : %s (%d bytes)%n", mdPath.toAbsolutePath(), md.length());
             if (htmlPath != null) {
@@ -157,7 +169,7 @@ class GenerateDigest implements Callable<Integer> {
         }
     }
 
-    private static List<Item> loadItems(Connection con, long topicId, long sinceMs) throws Exception {
+    private static List<Item> loadItems(Connection con, long topicId, long sinceMs, long untilMs) throws Exception {
         try (PreparedStatement ps = con.prepareStatement(
                 "SELECT i.id, i.title, i.url, i.author, s.name, i.published_at, " +
                         "       i.relevance_score, i.summary " +
@@ -165,10 +177,11 @@ class GenerateDigest implements Callable<Integer> {
                         "JOIN sources s ON i.source_id = s.id " +
                         "WHERE i.status = 'SUMMARIZED' " +
                         "  AND s.topic_id = ? " +
-                        "  AND (i.published_at IS NULL OR i.published_at >= ?) " +
+                        "  AND (i.published_at IS NULL OR i.published_at BETWEEN ? AND ?) " +
                         "ORDER BY i.relevance_score DESC, i.published_at DESC")) {
             ps.setLong(1, topicId);
             ps.setLong(2, sinceMs);
+            ps.setLong(3, untilMs);
             List<Item> out = new ArrayList<>();
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -189,9 +202,9 @@ class GenerateDigest implements Callable<Integer> {
         for (Item it : items) uniqueSources.add(it.sourceName);
 
         DateTimeFormatter dateFmt = DateTimeFormatter.ISO_LOCAL_DATE;
-        String periodStart = Instant.ofEpochMilli(periodStartMs).atZone(ZoneId.systemDefault())
+        String periodStart = Instant.ofEpochMilli(periodStartMs).atZone(ZoneOffset.UTC)
                 .toLocalDate().format(dateFmt);
-        String periodEnd = Instant.ofEpochMilli(periodEndMs).atZone(ZoneId.systemDefault())
+        String periodEnd = Instant.ofEpochMilli(periodEndMs).atZone(ZoneOffset.UTC)
                 .toLocalDate().format(dateFmt);
 
         StringBuilder sb = new StringBuilder();
@@ -231,7 +244,7 @@ class GenerateDigest implements Callable<Integer> {
         return sb.toString();
     }
 
-    private static String renderHtml(String markdown, TopicInfo topic, String today) {
+    private static String renderHtml(String markdown, TopicInfo topic, String periodEndDate) {
         Parser parser = Parser.builder().build();
         HtmlRenderer renderer = HtmlRenderer.builder().build();
         String body = renderer.render(parser.parse(markdown));
@@ -253,7 +266,7 @@ class GenerateDigest implements Callable<Integer> {
 
         return "<!DOCTYPE html>\n<html lang=\"en\"><head>\n"
                 + "<meta charset=\"utf-8\">\n"
-                + "<title>Veille — " + escapeHtml(topic.name) + " — " + today + "</title>\n"
+                + "<title>Veille — " + escapeHtml(topic.name) + " — " + periodEndDate + "</title>\n"
                 + "<style>" + css + "</style>\n"
                 + "</head><body>\n"
                 + body
@@ -315,6 +328,17 @@ class GenerateDigest implements Callable<Integer> {
         } finally {
             con.setAutoCommit(prevAuto);
         }
+    }
+
+    /** Inclusive upper bound: the last millisecond of the given day (UTC), or now if unset. */
+    private static long parseUntilCutoff(String until) {
+        if (until == null || until.isBlank()) return System.currentTimeMillis();
+        String s = until.strip();
+        if (!s.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            throw new IllegalArgumentException("--until: expected 'YYYY-MM-DD'; got: " + until);
+        }
+        return java.time.LocalDate.parse(s).plusDays(1)
+                .atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli() - 1;
     }
 
     private static long parseSinceCutoff(String since) {
